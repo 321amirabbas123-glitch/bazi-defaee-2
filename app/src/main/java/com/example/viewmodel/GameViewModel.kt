@@ -12,6 +12,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import java.io.File
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -36,9 +40,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedTargetIds = MutableStateFlow<List<String>>(emptyList())
     val selectedTargetIds: StateFlow<List<String>> = _selectedTargetIds.asStateFlow()
 
+    private var gracePeriodJob: Job? = null
+    private val _gracePeriodRemaining = MutableStateFlow<Int?>(null)
+    val gracePeriodRemaining: StateFlow<Int?> = _gracePeriodRemaining.asStateFlow()
+
     init {
         // Try to load autosave initially to prevent loss of progress
         loadAutosavePreset()
+
+        // Start periodic autosave every 10 seconds
+        viewModelScope.launch {
+            while (isActive) {
+                delay(10000)
+                saveActiveMatchState()
+            }
+        }
     }
 
     private fun loadAutosavePreset() {
@@ -114,10 +130,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.update { it.copy(statusMessage = "Waiting for client connection...") }
                 }
                 GameNetworkManager.ConnectionStatus.CONNECTED -> {
+                    gracePeriodJob?.cancel()
+                    gracePeriodJob = null
+                    _gracePeriodRemaining.value = null
+
                     _uiState.update { current ->
+                        val targetState = if (current.matchState == MatchState.CREATE_JOIN || current.matchState == MatchState.CONNECTION_LOST) {
+                            MatchState.LOBBY
+                        } else {
+                            current.matchState
+                        }
                         val newState = current.copy(
-                            matchState = MatchState.LOBBY,
-                            statusMessage = "Players connected! Ready to configure."
+                            matchState = targetState,
+                            statusMessage = "Players connected! Ready."
                         )
                         if (current.isHost) {
                             syncStateToClient(newState)
@@ -128,7 +153,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 GameNetworkManager.ConnectionStatus.DISCONNECTED -> {
                     val current = _uiState.value
                     if (current.matchState != MatchState.MAIN_MENU && current.matchState != MatchState.VICTORY_SCREEN) {
-                        _uiState.update { it.copy(matchState = MatchState.CONNECTION_LOST, statusMessage = "Connection lost!") }
+                        if (current.isHost) {
+                            Log.d(TAG, "Host disconnected, restarting server for re-connection...")
+                            networkManager?.disconnect()
+                            networkManager = GameNetworkManager(
+                                onMessageReceived = { msg -> handleIncomingNetworkMessage(msg) },
+                                onConnectionStateChanged = { status -> handleConnectionStatusChange(status) }
+                            )
+                            networkManager?.startServer()
+                        }
+                        startDisconnectGracePeriod()
                     }
                 }
             }
@@ -153,6 +187,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                             // Keep Client-side specific attributes
                             syncedState.copy(isHost = false)
                         }
+                        saveActiveMatchState()
                     }
                 }
             } catch (e: Exception) {
@@ -166,6 +201,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val jsonState = GameJsonParser.toJson(state)
         val event = NetworkEvent(type = "SYNC", data = jsonState)
         networkManager?.sendMessage(GameJsonParser.eventToJson(event))
+        saveActiveMatchState()
     }
 
     private fun sendCommandToHost(cmd: ClientCommand) {
@@ -1177,6 +1213,102 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             currentTargets.add(targetId)
         }
         _selectedTargetIds.value = currentTargets
+    }
+
+    fun saveActiveMatchState() {
+        val current = _uiState.value
+        if (current.matchState == MatchState.MAIN_MENU || current.matchState == MatchState.VICTORY_SCREEN) return
+        
+        try {
+            val file = File(context.filesDir, "active_game_session.json")
+            val json = GameJsonParser.toJson(current)
+            file.writeText(json)
+            Log.d(TAG, "Saved active game session state.")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving active game session", e)
+        }
+    }
+
+    fun hasSavedGame(): Boolean {
+        return File(context.filesDir, "active_game_session.json").exists()
+    }
+
+    fun resumeGame() {
+        try {
+            val file = File(context.filesDir, "active_game_session.json")
+            if (!file.exists()) {
+                _uiState.update { it.copy(statusMessage = "No saved match found!") }
+                return
+            }
+            val json = file.readText()
+            val savedState = GameJsonParser.fromJson(json)
+            if (savedState != null) {
+                _uiState.value = savedState.copy(statusMessage = "Resumed saved match!")
+                
+                // Reconnect / start server based on host status
+                if (savedState.isHost) {
+                    networkManager = GameNetworkManager(
+                        onMessageReceived = { msg -> handleIncomingNetworkMessage(msg) },
+                        onConnectionStateChanged = { status -> handleConnectionStatusChange(status) }
+                    )
+                    networkManager?.startServer()
+                } else {
+                    networkManager = GameNetworkManager(
+                        onMessageReceived = { msg -> handleIncomingNetworkMessage(msg) },
+                        onConnectionStateChanged = { status -> handleConnectionStatusChange(status) }
+                    )
+                    networkManager?.connectToHost(savedState.hostIp)
+                }
+            } else {
+                _uiState.update { it.copy(statusMessage = "Failed to parse saved match.") }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error resuming game", e)
+            _uiState.update { it.copy(statusMessage = "Error loading saved match: ${e.message}") }
+        }
+    }
+
+    private fun startDisconnectGracePeriod() {
+        if (gracePeriodJob != null) return // Already running
+        
+        gracePeriodJob = viewModelScope.launch {
+            _gracePeriodRemaining.value = 25
+            
+            val current = _uiState.value
+            // If we are Client, try to reconnect periodically
+            if (!current.isHost) {
+                launch {
+                    while ((_gracePeriodRemaining.value ?: 0) > 0) {
+                        delay(4000)
+                        if (_gracePeriodRemaining.value != null) {
+                            Log.d(TAG, "Client attempting to reconnect to ${current.hostIp}...")
+                            networkManager?.disconnect()
+                            networkManager = GameNetworkManager(
+                                onMessageReceived = { msg -> handleIncomingNetworkMessage(msg) },
+                                onConnectionStateChanged = { status -> handleConnectionStatusChange(status) }
+                            )
+                            networkManager?.connectToHost(current.hostIp)
+                        }
+                    }
+                }
+            }
+
+            while ((_gracePeriodRemaining.value ?: 0) > 0) {
+                delay(1000)
+                _gracePeriodRemaining.value = (_gracePeriodRemaining.value ?: 0) - 1
+            }
+            
+            // If still disconnected after grace period, transition to CONNECTION_LOST
+            _uiState.update { curr ->
+                if (curr.matchState != MatchState.MAIN_MENU && curr.matchState != MatchState.VICTORY_SCREEN) {
+                    curr.copy(matchState = MatchState.CONNECTION_LOST, statusMessage = "Connection lost permanently!")
+                } else {
+                    curr
+                }
+            }
+            _gracePeriodRemaining.value = null
+            gracePeriodJob = null
+        }
     }
 
     override fun onCleared() {

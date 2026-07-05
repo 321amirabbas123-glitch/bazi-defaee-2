@@ -7,6 +7,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -41,6 +44,81 @@ import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
+
+val emblemList = listOf(
+    "Infantry" to Icons.Default.DirectionsRun,
+    "Cavalry" to Icons.Default.Speed,
+    "Armor" to Icons.Default.Agriculture,
+    "Artillery" to Icons.Default.RadioButtonChecked,
+    "Recon" to Icons.Default.Explore,
+    "Airborne" to Icons.Default.AirplanemodeActive,
+    "Marines" to Icons.Default.Anchor,
+    "HQ" to Icons.Default.Flag,
+    "General" to Icons.Default.Star,
+    "Medal" to Icons.Default.MilitaryTech,
+    "Defense" to Icons.Default.Shield,
+    "Shock" to Icons.Default.FlashOn,
+    "Incendiary" to Icons.Default.LocalFireDepartment,
+    "Medical" to Icons.Default.Add,
+    "Artillery Target" to Icons.Default.Adjust,
+    "Radar" to Icons.Default.Radar,
+    "Engineering" to Icons.Default.Build,
+    "Fortification" to Icons.Default.Lock,
+    "Demolition" to Icons.Default.Warning,
+    "Intel" to Icons.Default.VpnKey,
+    "Beast" to Icons.Default.Pets,
+    "Special Ops" to Icons.Default.VisibilityOff,
+    "NATO Saltire" to Icons.Default.Close,
+    "Double Chevron" to Icons.Default.KeyboardArrowUp,
+    "Blockade" to Icons.Default.Block,
+    "Sniper" to Icons.Default.FilterCenterFocus,
+    "Logistic" to Icons.Default.LocalShipping,
+    "Naval" to Icons.Default.DirectionsBoat,
+    "Communications" to Icons.Default.Call,
+    "Radio HQ" to Icons.Default.Wifi
+)
+
+fun getEmblemIcon(iconName: String, isEngineer: Boolean = false): ImageVector {
+    if (isEngineer) return Icons.Default.Build
+    return when (iconName.lowercase()) {
+        "infantry" -> Icons.Default.DirectionsRun
+        "cavalry" -> Icons.Default.Speed
+        "armor" -> Icons.Default.Agriculture
+        "artillery" -> Icons.Default.RadioButtonChecked
+        "recon" -> Icons.Default.Explore
+        "airborne" -> Icons.Default.AirplanemodeActive
+        "marines" -> Icons.Default.Anchor
+        "hq" -> Icons.Default.Flag
+        "general" -> Icons.Default.Star
+        "medal" -> Icons.Default.MilitaryTech
+        "defense" -> Icons.Default.Shield
+        "shock" -> Icons.Default.FlashOn
+        "incendiary" -> Icons.Default.LocalFireDepartment
+        "medical" -> Icons.Default.Add
+        "artillery target" -> Icons.Default.Adjust
+        "radar" -> Icons.Default.Radar
+        "engineering" -> Icons.Default.Build
+        "fortification" -> Icons.Default.Lock
+        "demolition" -> Icons.Default.Warning
+        "intel" -> Icons.Default.VpnKey
+        "beast" -> Icons.Default.Pets
+        "special ops" -> Icons.Default.VisibilityOff
+        "nato saltire" -> Icons.Default.Close
+        "double chevron" -> Icons.Default.KeyboardArrowUp
+        "blockade" -> Icons.Default.Block
+        "sniper" -> Icons.Default.FilterCenterFocus
+        "logistic" -> Icons.Default.LocalShipping
+        "naval" -> Icons.Default.DirectionsBoat
+        "communications" -> Icons.Default.Call
+        "radio hq" -> Icons.Default.Wifi
+        "soldier" -> Icons.Default.DirectionsRun
+        "archer" -> Icons.Default.Adjust
+        "knight" -> Icons.Default.Shield
+        "mage" -> Icons.Default.FlashOn
+        "star" -> Icons.Default.Star
+        else -> Icons.Default.DirectionsRun
+    }
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -162,6 +240,31 @@ fun MainMenuScreen(viewModel: GameViewModel) {
         }
 
         // Action Buttons
+        val hasSaved by produceState(initialValue = false, viewModel) {
+            value = viewModel.hasSavedGame()
+        }
+
+        if (hasSaved) {
+            Button(
+                onClick = { viewModel.resumeGame() },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .width(280.dp)
+                    .height(56.dp)
+                    .testTag("continue_match_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Restore,
+                    contentDescription = "Continue Saved Match",
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text("CONTINUE SAVED MATCH", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         Button(
             onClick = { viewModel.hostGame() },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9)),
@@ -826,13 +929,7 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp)
                     ) {
-                        val classIcon = when (uc.iconName.lowercase()) {
-                            "archer" -> Icons.Default.Adjust
-                            "knight" -> Icons.Default.Shield
-                            "mage" -> Icons.Default.FlashOn
-                            "beast" -> Icons.Default.Pets
-                            else -> Icons.Default.DirectionsRun
-                        }
+                        val classIcon = getEmblemIcon(uc.iconName)
                         Icon(classIcon, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
@@ -936,28 +1033,27 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
                                         .padding(vertical = 8.dp)
                                 )
 
-                                Text("Select Icon Representation:", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.padding(vertical = 4.dp))
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                Text("Select Tactical Icon Emblem (30 Available):", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.padding(vertical = 4.dp))
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                                 ) {
-                                    listOf(
-                                        "Soldier" to Icons.Default.DirectionsRun,
-                                        "Archer" to Icons.Default.Adjust,
-                                        "Knight" to Icons.Default.Shield,
-                                        "Mage" to Icons.Default.FlashOn,
-                                        "Beast" to Icons.Default.Pets
-                                    ).forEach { (name, icon) ->
+                                    items(emblemList) { (name, icon) ->
                                         IconButton(
                                             onClick = { selectedIcon = name },
                                             modifier = Modifier
-                                                .size(36.dp)
+                                                .size(40.dp)
                                                 .background(
                                                     if (selectedIcon == name) Color(0xFF38BDF8) else Color(0xFF1E293B),
-                                                    RoundedCornerShape(4.dp)
+                                                    RoundedCornerShape(6.dp)
                                                 )
                                         ) {
-                                            Icon(icon, contentDescription = name, tint = if (selectedIcon == name) Color.Black else Color.White, modifier = Modifier.size(18.dp))
+                                            Icon(
+                                                imageVector = icon,
+                                                contentDescription = name,
+                                                tint = if (selectedIcon == name) Color.Black else Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
                                         }
                                     }
                                 }
@@ -1747,6 +1843,7 @@ fun HexGridPreviewLayout(
     hexRadius: Dp,
     onTileTap: (Int, Int) -> Unit
 ) {
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
     ZoomableBox(modifier = Modifier.fillMaxSize()) { scale, offset, viewWidth, viewHeight ->
         val radiusPx = hexRadius.value
         val widthPx = radiusPx * 1.732f
@@ -1757,21 +1854,22 @@ fun HexGridPreviewLayout(
         val totalGridWidth = (state.cols - 1) * horizontalSpacing + (widthPx / 2f)
         val totalGridHeight = (state.rows - 1) * verticalSpacing + heightPx
 
-        // Culling calculation
-        val leftLimit = (viewWidth / 2f) - (viewWidth / 2f + offset.x) / scale - (widthPx * 2f)
-        val topLimit = (viewHeight / 2f) - (viewHeight / 2f + offset.y) / scale - (heightPx * 2f)
-        val rightLimit = leftLimit + (viewWidth / scale) + (widthPx * 4f)
-        val bottomLimit = topLimit + (viewHeight / scale) + (heightPx * 4f)
+        // Culling calculation with density conversion and extremely generous margins
+        val leftLimit = ((viewWidth / 2f) - (viewWidth / 2f + offset.x) / scale) / density - (widthPx * 8f)
+        val topLimit = ((viewHeight / 2f) - (viewHeight / 2f + offset.y) / scale) / density - (heightPx * 8f)
+        val rightLimit = leftLimit + (viewWidth / scale) / density + (widthPx * 16f)
+        val bottomLimit = topLimit + (viewHeight / scale) / density + (heightPx * 16f)
 
         Box(
             modifier = Modifier.size(totalGridWidth.dp, totalGridHeight.dp)
         ) {
+            // PASS 1: Terrain Backgrounds
             state.tiles.forEach { tile ->
                 val x = tile.col * horizontalSpacing + (if (tile.row % 2 != 0) horizontalSpacing / 2f else 0f)
                 val y = tile.row * verticalSpacing
 
                 if (state.tiles.size <= 200 || (x in leftLimit..rightLimit && y in topLimit..bottomLimit)) {
-                    key(tile.row, tile.col) {
+                    key("preview_p1_${tile.row}_${tile.col}") {
                         val terrainColor = when (tile.terrain) {
                             TerrainType.PLAINS -> Color(0xFF15803D) // Emerald 700
                             TerrainType.HILLS -> Color(0xFFEAB308) // Yellow 500
@@ -1786,26 +1884,42 @@ fun HexGridPreviewLayout(
                                 .clip(HexagonShape())
                                 .background(terrainColor)
                                 .clickable { onTileTap(tile.row, tile.col) }
-                        ) {
-                            // Check if Castle
-                            if (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col) {
-                                Icon(
-                                    imageVector = Icons.Default.Fort,
-                                    contentDescription = "P1 Castle",
-                                    tint = Color.White,
-                                    modifier = Modifier
-                                        .size((hexRadius.value * 1.2f).dp)
-                                        .align(Alignment.Center)
-                                )
-                            } else if (tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) {
-                                Icon(
-                                    imageVector = Icons.Default.Fort,
-                                    contentDescription = "P2 Castle",
-                                    tint = Color.Magenta,
-                                    modifier = Modifier
-                                        .size((hexRadius.value * 1.2f).dp)
-                                        .align(Alignment.Center)
-                                )
+                        )
+                    }
+                }
+            }
+
+            // PASS 2: Castles & Entities
+            state.tiles.forEach { tile ->
+                val x = tile.col * horizontalSpacing + (if (tile.row % 2 != 0) horizontalSpacing / 2f else 0f)
+                val y = tile.row * verticalSpacing
+
+                if (state.tiles.size <= 200 || (x in leftLimit..rightLimit && y in topLimit..bottomLimit)) {
+                    val isHostCastle = tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col
+                    val isClientCastle = tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col
+                    if (isHostCastle || isClientCastle) {
+                        key("preview_p2_${tile.row}_${tile.col}") {
+                            Box(
+                                modifier = Modifier
+                                    .size(widthPx.dp, heightPx.dp)
+                                    .offset(x.dp, y.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isHostCastle) {
+                                    Icon(
+                                        imageVector = Icons.Default.Fort,
+                                        contentDescription = "P1 Castle",
+                                        tint = Color.White,
+                                        modifier = Modifier.size((hexRadius.value * 1.2f).dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Fort,
+                                        contentDescription = "P2 Castle",
+                                        tint = Color.Magenta,
+                                        modifier = Modifier.size((hexRadius.value * 1.2f).dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -1823,6 +1937,7 @@ fun HexGridDeploymentLayout(
     selectedClass: String?,
     onTileTap: (Int, Int) -> Unit
 ) {
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
     ZoomableBox(modifier = Modifier.fillMaxSize()) { scale, offset, viewWidth, viewHeight ->
         val radiusPx = hexRadius.value
         val widthPx = radiusPx * 1.732f
@@ -1833,19 +1948,20 @@ fun HexGridDeploymentLayout(
         val totalGridWidth = (state.cols - 1) * horizontalSpacing + (widthPx / 2f)
         val totalGridHeight = (state.rows - 1) * verticalSpacing + heightPx
 
-        // Culling calculation
-        val leftLimit = (viewWidth / 2f) - (viewWidth / 2f + offset.x) / scale - (widthPx * 2f)
-        val topLimit = (viewHeight / 2f) - (viewHeight / 2f + offset.y) / scale - (heightPx * 2f)
-        val rightLimit = leftLimit + (viewWidth / scale) + (widthPx * 4f)
-        val bottomLimit = topLimit + (viewHeight / scale) + (heightPx * 4f)
+        // Culling calculation with density conversion and extremely generous margins
+        val leftLimit = ((viewWidth / 2f) - (viewWidth / 2f + offset.x) / scale) / density - (widthPx * 8f)
+        val topLimit = ((viewHeight / 2f) - (viewHeight / 2f + offset.y) / scale) / density - (heightPx * 8f)
+        val rightLimit = leftLimit + (viewWidth / scale) / density + (widthPx * 16f)
+        val bottomLimit = topLimit + (viewHeight / scale) / density + (heightPx * 16f)
 
         Box(modifier = Modifier.size(totalGridWidth.dp, totalGridHeight.dp)) {
+            // PASS 1: Terrain Backgrounds and Highlight Overlays
             state.tiles.forEach { tile ->
                 val x = tile.col * horizontalSpacing + (if (tile.row % 2 != 0) horizontalSpacing / 2f else 0f)
                 val y = tile.row * verticalSpacing
 
                 if (state.tiles.size <= 200 || (x in leftLimit..rightLimit && y in topLimit..bottomLimit)) {
-                    key(tile.row, tile.col) {
+                    key("deploy_p1_${tile.row}_${tile.col}") {
                         val terrainColor = when (tile.terrain) {
                             TerrainType.PLAINS -> Color(0xFF166534)
                             TerrainType.HILLS -> Color(0xFFCA8A04)
@@ -1877,7 +1993,6 @@ fun HexGridDeploymentLayout(
                                 }
                                 .clickable { onTileTap(tile.row, tile.col) }
                         ) {
-                            // Highlight deployment zone tinted overlay
                             if (inMyDeployZone) {
                                 Box(
                                     modifier = Modifier
@@ -1885,75 +2000,85 @@ fun HexGridDeploymentLayout(
                                         .background(Color(0x1F10B981))
                                 )
                             }
+                        }
+                    }
+                }
+            }
 
-                            // Render Castles
-                            if (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col) {
-                                Icon(
-                                    imageVector = Icons.Default.Fort,
-                                    contentDescription = "P1 Castle",
-                                    tint = Color(0xFF38BDF8),
-                                    modifier = Modifier
-                                        .size((hexRadius.value * 1.3f).dp)
-                                        .align(Alignment.Center)
-                                )
-                            } else if (tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) {
-                                Icon(
-                                    imageVector = Icons.Default.Fort,
-                                    contentDescription = "P2 Castle",
-                                    tint = Color(0xFFF43F5E),
-                                    modifier = Modifier
-                                        .size((hexRadius.value * 1.3f).dp)
-                                        .align(Alignment.Center)
-                                )
-                            }
+            // PASS 2: Castles & Deployed Units
+            state.tiles.forEach { tile ->
+                val x = tile.col * horizontalSpacing + (if (tile.row % 2 != 0) horizontalSpacing / 2f else 0f)
+                val y = tile.row * verticalSpacing
 
-                            // Render any deployed unit on this tile
-                            val hostUnit = state.hostDeployedUnits.find { it.row == tile.row && it.col == tile.col }
-                            val clientUnit = state.clientDeployedUnits.find { it.row == tile.row && it.col == tile.col }
-                            val topUnit = hostUnit ?: clientUnit
+                if (state.tiles.size <= 200 || (x in leftLimit..rightLimit && y in topLimit..bottomLimit)) {
+                    val isHostCastle = tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col
+                    val isClientCastle = tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col
+                    val hostUnit = state.hostDeployedUnits.find { it.row == tile.row && it.col == tile.col }
+                    val clientUnit = state.clientDeployedUnits.find { it.row == tile.row && it.col == tile.col }
+                    val topUnit = hostUnit ?: clientUnit
 
-                            if (topUnit != null) {
-                                val badgeColor = if (topUnit.owner == PlayerType.HOST) Color(0xFF38BDF8) else Color(0xFFF43F5E)
-                                Column(
-                                    modifier = Modifier.align(Alignment.Center),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    val unitClass = state.unitClasses.find { it.name == topUnit.className }
-                                    val iconVec = when (unitClass?.iconName?.lowercase()) {
-                                        "archer" -> Icons.Default.Adjust
-                                        "knight" -> Icons.Default.Shield
-                                        "mage" -> Icons.Default.FlashOn
-                                        "star" -> Icons.Default.Star
-                                        "beast" -> Icons.Default.Pets
-                                        else -> if (topUnit.isEngineer) Icons.Default.Build else Icons.Default.DirectionsRun
-                                    }
+                    if (isHostCastle || isClientCastle || topUnit != null) {
+                        key("deploy_p2_${tile.row}_${tile.col}") {
+                            Box(
+                                modifier = Modifier
+                                    .size(widthPx.dp, heightPx.dp)
+                                    .offset(x.dp, y.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Render Castles
+                                if (isHostCastle) {
                                     Icon(
-                                        imageVector = iconVec,
-                                        contentDescription = topUnit.className,
-                                        tint = badgeColor,
-                                        modifier = Modifier.size((hexRadius.value * 1.2f).dp)
+                                        imageVector = Icons.Default.Fort,
+                                        contentDescription = "P1 Castle",
+                                        tint = Color(0xFF38BDF8),
+                                        modifier = Modifier.size((hexRadius.value * 1.3f).dp)
                                     )
-                                    Text(
-                                        text = topUnit.className.take(3).uppercase(),
-                                        color = Color.White,
-                                        fontSize = (hexRadius.value * 0.5f).sp,
-                                        fontWeight = FontWeight.Bold
+                                } else if (isClientCastle) {
+                                    Icon(
+                                        imageVector = Icons.Default.Fort,
+                                        contentDescription = "P2 Castle",
+                                        tint = Color(0xFFF43F5E),
+                                        modifier = Modifier.size((hexRadius.value * 1.3f).dp)
                                     )
                                 }
 
-                                // Stacking Indicator Badge (+ENG badge)
-                                val hasStackedEng = (state.hostDeployedUnits + state.clientDeployedUnits)
-                                    .count { it.row == tile.row && it.col == tile.col } > 1
-
-                                if (hasStackedEng) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size((hexRadius.value * 0.7f).dp)
-                                            .align(Alignment.TopEnd)
-                                            .background(Color(0xFF8B5CF6), CircleShape),
-                                        contentAlignment = Alignment.Center
+                                // Render Deployed Unit
+                                if (topUnit != null) {
+                                    val badgeColor = if (topUnit.owner == PlayerType.HOST) Color(0xFF38BDF8) else Color(0xFFF43F5E)
+                                    Column(
+                                        modifier = Modifier.align(Alignment.Center),
+                                        horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
-                                        Text("+", color = Color.White, fontSize = (hexRadius.value * 0.45f).sp, fontWeight = FontWeight.Bold)
+                                        val unitClass = state.unitClasses.find { it.name == topUnit.className }
+                                        val iconVec = getEmblemIcon(unitClass?.iconName ?: "", topUnit.isEngineer)
+                                        Icon(
+                                            imageVector = iconVec,
+                                            contentDescription = topUnit.className,
+                                            tint = badgeColor,
+                                            modifier = Modifier.size((hexRadius.value * 1.2f).dp)
+                                        )
+                                        Text(
+                                            text = topUnit.className.take(3).uppercase(),
+                                            color = Color.White,
+                                            fontSize = (hexRadius.value * 0.5f).sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    // Stacking Indicator Badge
+                                    val hasStackedEng = (state.hostDeployedUnits + state.clientDeployedUnits)
+                                        .count { it.row == tile.row && it.col == tile.col } > 1
+
+                                    if (hasStackedEng) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size((hexRadius.value * 0.7f).dp)
+                                                .align(Alignment.TopEnd)
+                                                .background(Color(0xFF8B5CF6), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("+", color = Color.White, fontSize = (hexRadius.value * 0.45f).sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
@@ -1975,6 +2100,7 @@ fun HexGridGameplayLayout(
     selectedTargetIds: List<String>,
     onTileTap: (Int, Int) -> Unit
 ) {
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
     ZoomableBox(modifier = Modifier.fillMaxSize()) { scale, offset, viewWidth, viewHeight ->
         val radiusPx = hexRadius.value
         val widthPx = radiusPx * 1.732f
@@ -1985,23 +2111,20 @@ fun HexGridGameplayLayout(
         val totalGridWidth = (state.cols - 1) * horizontalSpacing + (widthPx / 2f)
         val totalGridHeight = (state.rows - 1) * verticalSpacing + heightPx
 
-        // Culling calculation
-        val leftLimit = (viewWidth / 2f) - (viewWidth / 2f + offset.x) / scale - (widthPx * 2f)
-        val topLimit = (viewHeight / 2f) - (viewHeight / 2f + offset.y) / scale - (heightPx * 2f)
-        val rightLimit = leftLimit + (viewWidth / scale) + (widthPx * 4f)
-        val bottomLimit = topLimit + (viewHeight / scale) + (heightPx * 4f)
+        // Culling calculation with density conversion and extremely generous margins
+        val leftLimit = ((viewWidth / 2f) - (viewWidth / 2f + offset.x) / scale) / density - (widthPx * 8f)
+        val topLimit = ((viewHeight / 2f) - (viewHeight / 2f + offset.y) / scale) / density - (heightPx * 8f)
+        val rightLimit = leftLimit + (viewWidth / scale) / density + (widthPx * 16f)
+        val bottomLimit = topLimit + (viewHeight / scale) / density + (heightPx * 16f)
 
         Box(modifier = Modifier.size(totalGridWidth.dp, totalGridHeight.dp)) {
+            // PASS 1: Terrain Backgrounds, Obstacles, Overlays, and Clickable Interactions
             state.tiles.forEach { tile ->
                 val x = tile.col * horizontalSpacing + (if (tile.row % 2 != 0) horizontalSpacing / 2f else 0f)
                 val y = tile.row * verticalSpacing
 
                 if (state.tiles.size <= 200 || (x in leftLimit..rightLimit && y in topLimit..bottomLimit)) {
-                    key(tile.row, tile.col) {
-                        // FOG OF WAR Dynamic visibility
-                        val isVisible = !state.isHost && state.fogOfWarMode == FogOfWarMode.FOG_OF_WAR &&
-                                        !state.tiles.any { isTileVisibleFromPlayer(myPlayer, tile.row, tile.col, state) }
-                        
+                    key("gameplay_p1_${tile.row}_${tile.col}") {
                         // Let's check visibility from Host/Client perspectives correctly
                         val actualVisible = if (state.fogOfWarMode == FogOfWarMode.FULL_VISIBILITY) {
                             true
@@ -2090,84 +2213,101 @@ fun HexGridGameplayLayout(
                                 }
                                 .clickable { onTileTap(tile.row, tile.col) }
                         ) {
-                            // Fog darker cover
                             if (!actualVisible) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .background(Color(0x99020617))
                                 )
-                            } else {
-                                // Render Castles if visible
-                                if (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col) {
-                                    Icon(
-                                        imageVector = Icons.Default.Fort,
-                                        contentDescription = "P1 Castle",
-                                        tint = Color(0xFF38BDF8),
-                                        modifier = Modifier
-                                            .size((hexRadius.value * 1.35f).dp)
-                                            .align(Alignment.Center)
-                                    )
-                                } else if (tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) {
-                                    Icon(
-                                        imageVector = Icons.Default.Fort,
-                                        contentDescription = "P2 Castle",
-                                        tint = Color(0xFFF43F5E),
-                                        modifier = Modifier
-                                            .size((hexRadius.value * 1.35f).dp)
-                                            .align(Alignment.Center)
-                                    )
-                                }
+                            }
+                        }
+                    }
+                }
+            }
 
-                                // Render Unit if visible
-                                val hostUnit = state.hostDeployedUnits.find { it.row == tile.row && it.col == tile.col }
-                                val clientUnit = state.clientDeployedUnits.find { it.row == tile.row && it.col == tile.col }
-                                val topUnit = hostUnit ?: clientUnit
+            // PASS 2: Deployed Castles, Units, HP bars, and Stack overlays
+            state.tiles.forEach { tile ->
+                val x = tile.col * horizontalSpacing + (if (tile.row % 2 != 0) horizontalSpacing / 2f else 0f)
+                val y = tile.row * verticalSpacing
 
-                                if (topUnit != null) {
-                                    val badgeColor = if (topUnit.owner == PlayerType.HOST) Color(0xFF38BDF8) else Color(0xFFF43F5E)
-                                    Column(
-                                        modifier = Modifier.align(Alignment.Center),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        val unitClass = state.unitClasses.find { it.name == topUnit.className }
-                                        val iconVec = when (unitClass?.iconName?.lowercase()) {
-                                            "archer" -> Icons.Default.Adjust
-                                            "knight" -> Icons.Default.Shield
-                                            "mage" -> Icons.Default.FlashOn
-                                            "star" -> Icons.Default.Star
-                                            "beast" -> Icons.Default.Pets
-                                            else -> if (topUnit.isEngineer) Icons.Default.Build else Icons.Default.DirectionsRun
-                                        }
+                if (state.tiles.size <= 200 || (x in leftLimit..rightLimit && y in topLimit..bottomLimit)) {
+                    val actualVisible = if (state.fogOfWarMode == FogOfWarMode.FULL_VISIBILITY) {
+                        true
+                    } else {
+                        isTileVisibleFromPlayer(myPlayer, tile.row, tile.col, state)
+                    }
+
+                    if (actualVisible) {
+                        val isHostCastle = tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col
+                        val isClientCastle = tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col
+                        val hostUnit = state.hostDeployedUnits.find { it.row == tile.row && it.col == tile.col }
+                        val clientUnit = state.clientDeployedUnits.find { it.row == tile.row && it.col == tile.col }
+                        val topUnit = hostUnit ?: clientUnit
+
+                        if (isHostCastle || isClientCastle || topUnit != null) {
+                            key("gameplay_p2_${tile.row}_${tile.col}") {
+                                Box(
+                                    modifier = Modifier
+                                        .size(widthPx.dp, heightPx.dp)
+                                        .offset(x.dp, y.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Render Castles if visible
+                                    if (isHostCastle) {
                                         Icon(
-                                            imageVector = iconVec,
-                                            contentDescription = topUnit.className,
-                                            tint = badgeColor,
-                                            modifier = Modifier.size((hexRadius.value * 1.2f).dp)
+                                            imageVector = Icons.Default.Fort,
+                                            contentDescription = "P1 Castle",
+                                            tint = Color(0xFF38BDF8),
+                                            modifier = Modifier.size((hexRadius.value * 1.35f).dp)
                                         )
-                                        Text(
-                                            text = "${topUnit.hp}",
-                                            color = Color.White,
-                                            fontSize = (hexRadius.value * 0.55f).sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            modifier = Modifier
-                                                .background(Color(0x99000000), RoundedCornerShape(4.dp))
-                                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                    } else if (isClientCastle) {
+                                        Icon(
+                                            imageVector = Icons.Default.Fort,
+                                            contentDescription = "P2 Castle",
+                                            tint = Color(0xFFF43F5E),
+                                            modifier = Modifier.size((hexRadius.value * 1.35f).dp)
                                         )
                                     }
 
-                                    // Stacked Unit overlay indicator
-                                    val unitCount = (state.hostDeployedUnits + state.clientDeployedUnits)
-                                        .count { it.row == tile.row && it.col == tile.col }
-                                    if (unitCount > 1) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size((hexRadius.value * 0.7f).dp)
-                                                .align(Alignment.TopEnd)
-                                                .background(Color(0xFF8B5CF6), CircleShape),
-                                            contentAlignment = Alignment.Center
+                                    // Render Unit if visible
+                                    if (topUnit != null) {
+                                        val badgeColor = if (topUnit.owner == PlayerType.HOST) Color(0xFF38BDF8) else Color(0xFFF43F5E)
+                                        Column(
+                                            modifier = Modifier.align(Alignment.Center),
+                                            horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
-                                            Text("+", color = Color.White, fontSize = (hexRadius.value * 0.45f).sp, fontWeight = FontWeight.Bold)
+                                            val unitClass = state.unitClasses.find { it.name == topUnit.className }
+                                            val iconVec = getEmblemIcon(unitClass?.iconName ?: "", topUnit.isEngineer)
+                                            Icon(
+                                                imageVector = iconVec,
+                                                contentDescription = topUnit.className,
+                                                tint = badgeColor,
+                                                modifier = Modifier.size((hexRadius.value * 1.2f).dp)
+                                            )
+                                            Text(
+                                                text = "${topUnit.hp}",
+                                                color = Color.White,
+                                                fontSize = (hexRadius.value * 0.55f).sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                modifier = Modifier
+                                                    .background(Color(0x99000000), RoundedCornerShape(4.dp))
+                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+
+                                        // Stacked Unit overlay indicator
+                                        val unitCount = (state.hostDeployedUnits + state.clientDeployedUnits)
+                                            .count { it.row == tile.row && it.col == tile.col }
+                                        if (unitCount > 1) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size((hexRadius.value * 0.7f).dp)
+                                                    .align(Alignment.TopEnd)
+                                                    .background(Color(0xFF8B5CF6), CircleShape),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text("+", color = Color.White, fontSize = (hexRadius.value * 0.45f).sp, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     }
                                 }
