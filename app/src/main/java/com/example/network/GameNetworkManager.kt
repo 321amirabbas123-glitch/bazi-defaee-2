@@ -104,15 +104,17 @@ class GameNetworkManager(
         if (!isRunning && clientSocket == null && serverSocket == null) return
         isRunning = false
         Log.d(TAG, "Disconnecting sockets...")
-        try { reader?.close() } catch (e: Exception) {}
-        try { writer?.close() } catch (e: Exception) {}
-        try { clientSocket?.close() } catch (e: Exception) {}
-        try { serverSocket?.close() } catch (e: Exception) {}
-        reader = null
-        writer = null
-        clientSocket = null
-        serverSocket = null
-        onConnectionStateChanged(ConnectionStatus.DISCONNECTED)
+        scope.launch {
+            try { reader?.close() } catch (e: Exception) {}
+            try { writer?.close() } catch (e: Exception) {}
+            try { clientSocket?.close() } catch (e: Exception) {}
+            try { serverSocket?.close() } catch (e: Exception) {}
+            reader = null
+            writer = null
+            clientSocket = null
+            serverSocket = null
+            onConnectionStateChanged(ConnectionStatus.DISCONNECTED)
+        }
     }
 
     companion object {

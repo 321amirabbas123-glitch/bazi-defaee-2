@@ -99,6 +99,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun disconnect() {
         networkManager?.disconnect()
+        networkManager = null
         _uiState.update { GameSessionState() }
         _selectedUnitId.value = null
         _targetSelectionMode.value = false
@@ -288,6 +289,51 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             current.copy(unitClasses = updatedClasses)
+        }
+        autoSaveAndSync()
+    }
+
+    fun addUnitClass(name: String, hp: Int, damage: Int, energy: Int, vision: Int, range: Int, count: Int, iconName: String) {
+        if (!_uiState.value.isHost) return
+        _uiState.update { current ->
+            val updatedClasses = current.unitClasses.toMutableList()
+            if (updatedClasses.any { it.name.lowercase() == name.lowercase() }) {
+                return@update current.copy(statusMessage = "Unit type with name '$name' already exists!")
+            }
+            updatedClasses.add(
+                UnitClassState(
+                    name = name,
+                    hp = hp,
+                    damage = damage,
+                    energy = energy,
+                    visionRange = vision,
+                    attackRange = range,
+                    deploymentCount = count,
+                    iconName = iconName
+                )
+            )
+            current.copy(unitClasses = updatedClasses, statusMessage = "Created new unit type: $name")
+        }
+        autoSaveAndSync()
+    }
+
+    fun deleteUnitClass(index: Int) {
+        if (!_uiState.value.isHost) return
+        _uiState.update { current ->
+            val updatedClasses = current.unitClasses.toMutableList()
+            if (index in updatedClasses.indices) {
+                val removed = updatedClasses.removeAt(index)
+                val updatedHostUnits = current.hostDeployedUnits.filterNot { it.className == removed.name }
+                val updatedClientUnits = current.clientDeployedUnits.filterNot { it.className == removed.name }
+                current.copy(
+                    unitClasses = updatedClasses,
+                    hostDeployedUnits = updatedHostUnits,
+                    clientDeployedUnits = updatedClientUnits,
+                    statusMessage = "Deleted unit type: ${removed.name}"
+                )
+            } else {
+                current
+            }
         }
         autoSaveAndSync()
     }

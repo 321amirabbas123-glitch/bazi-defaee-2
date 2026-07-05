@@ -38,6 +38,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Density
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -440,13 +443,14 @@ fun LobbyScreen(viewModel: GameViewModel, state: GameSessionState) {
 }
 
 // ==========================================
+// ==========================================
 // 4. HOST CONFIGURATION SCREEN
 // ==========================================
 @Composable
 fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
     var customPresetName by remember { mutableStateOf("") }
     var showPresetDialog by remember { mutableStateOf(false) }
-    var selectedBrush by remember { mutableStateOf(TerrainType.PLAINS) }
+    var selectedBrushMode by remember { mutableStateOf(BrushMode.PAINT_PLAINS) }
 
     Column(
         modifier = Modifier
@@ -564,7 +568,7 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
             }
         }
 
-        // Grid size configurator
+        // Grid size configurator (Up to 100x100 with +/- 10 fast-adjust buttons)
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
             border = BorderStroke(1.dp, Color(0xFF334155)),
@@ -574,7 +578,7 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Map Dimensions",
+                    text = "Map Dimensions (Max 100 x 100)",
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     modifier = Modifier.padding(bottom = 12.dp)
@@ -582,42 +586,96 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     // Rows
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Rows: ", color = Color(0xFF94A3B8))
-                        IconButton(
-                            onClick = { viewModel.updateGridSize(state.rows - 1, state.cols) },
-                            enabled = state.isHost && state.rows > 4
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Rows", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Remove, contentDescription = "Reduce Rows", tint = Color.White)
-                        }
-                        Text("${state.rows}", color = Color.White, fontWeight = FontWeight.Bold)
-                        IconButton(
-                            onClick = { viewModel.updateGridSize(state.rows + 1, state.cols) },
-                            enabled = state.isHost && state.rows < 12
-                        ) {
-                            Icon(imageVector = Icons.Default.Add, contentDescription = "Increase Rows", tint = Color.White)
+                            IconButton(
+                                onClick = { viewModel.updateGridSize((state.rows - 10).coerceAtLeast(4), state.cols) },
+                                enabled = state.isHost && state.rows > 10,
+                                modifier = Modifier.size(32.dp).background(Color(0xFF334155), CircleShape)
+                            ) {
+                                Text("-10", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                            IconButton(
+                                onClick = { viewModel.updateGridSize(state.rows - 1, state.cols) },
+                                enabled = state.isHost && state.rows > 4,
+                                modifier = Modifier.size(32.dp).background(Color(0xFF334155), CircleShape)
+                            ) {
+                                Icon(imageVector = Icons.Default.Remove, contentDescription = "Reduce Rows", tint = Color.White, modifier = Modifier.size(14.dp))
+                            }
+                            Text(
+                                "${state.rows}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                            IconButton(
+                                onClick = { viewModel.updateGridSize(state.rows + 1, state.cols) },
+                                enabled = state.isHost && state.rows < 100,
+                                modifier = Modifier.size(32.dp).background(Color(0xFF334155), CircleShape)
+                            ) {
+                                Icon(imageVector = Icons.Default.Add, contentDescription = "Increase Rows", tint = Color.White, modifier = Modifier.size(14.dp))
+                            }
+                            IconButton(
+                                onClick = { viewModel.updateGridSize((state.rows + 10).coerceAtMost(100), state.cols) },
+                                enabled = state.isHost && state.rows < 100,
+                                modifier = Modifier.size(32.dp).background(Color(0xFF334155), CircleShape)
+                            ) {
+                                Text("+10", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
 
                     // Cols
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Cols: ", color = Color(0xFF94A3B8))
-                        IconButton(
-                            onClick = { viewModel.updateGridSize(state.rows, state.cols - 1) },
-                            enabled = state.isHost && state.cols > 4
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Cols", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Remove, contentDescription = "Reduce Cols", tint = Color.White)
-                        }
-                        Text("${state.cols}", color = Color.White, fontWeight = FontWeight.Bold)
-                        IconButton(
-                            onClick = { viewModel.updateGridSize(state.rows, state.cols + 1) },
-                            enabled = state.isHost && state.cols < 12
-                        ) {
-                            Icon(imageVector = Icons.Default.Add, contentDescription = "Increase Cols", tint = Color.White)
+                            IconButton(
+                                onClick = { viewModel.updateGridSize(state.rows, (state.cols - 10).coerceAtLeast(4)) },
+                                enabled = state.isHost && state.cols > 10,
+                                modifier = Modifier.size(32.dp).background(Color(0xFF334155), CircleShape)
+                            ) {
+                                Text("-10", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                            IconButton(
+                                onClick = { viewModel.updateGridSize(state.rows, state.cols - 1) },
+                                enabled = state.isHost && state.cols > 4,
+                                modifier = Modifier.size(32.dp).background(Color(0xFF334155), CircleShape)
+                            ) {
+                                Icon(imageVector = Icons.Default.Remove, contentDescription = "Reduce Cols", tint = Color.White, modifier = Modifier.size(14.dp))
+                            }
+                            Text(
+                                "${state.cols}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                            IconButton(
+                                onClick = { viewModel.updateGridSize(state.rows, state.cols + 1) },
+                                enabled = state.isHost && state.cols < 100,
+                                modifier = Modifier.size(32.dp).background(Color(0xFF334155), CircleShape)
+                            ) {
+                                Icon(imageVector = Icons.Default.Add, contentDescription = "Increase Cols", tint = Color.White, modifier = Modifier.size(14.dp))
+                            }
+                            IconButton(
+                                onClick = { viewModel.updateGridSize(state.rows, (state.cols + 10).coerceAtMost(100)) },
+                                enabled = state.isHost && state.cols < 100,
+                                modifier = Modifier.size(32.dp).background(Color(0xFF334155), CircleShape)
+                            ) {
+                                Text("+10", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -634,41 +692,77 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Terrain Paint Brush",
+                    text = "Terrain Paint Brush & Castle Placement",
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
                 if (state.isHost) {
-                    // Brush selector
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp)
-                    ) {
-                        TerrainType.values().forEach { terrain ->
+                    Column(modifier = Modifier.padding(bottom = 16.dp)) {
+                        Text("Terrain Brushes:", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            val terrains = listOf(
+                                BrushMode.PAINT_PLAINS to "Plains",
+                                BrushMode.PAINT_HILLS to "Hills",
+                                BrushMode.PAINT_WATER to "Water",
+                                BrushMode.PAINT_MOUNTAINS to "Mtn"
+                            )
+                            terrains.forEach { (mode, label) ->
+                                Button(
+                                    onClick = { selectedBrushMode = mode },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (selectedBrushMode == mode) Color(0xFF10B981) else Color(0xFF334155)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text(label, fontSize = 11.sp, color = Color.White)
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Authoritative Castle Placement:", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Button(
-                                onClick = { selectedBrush = terrain },
+                                onClick = { selectedBrushMode = BrushMode.PLACE_HOST_CASTLE },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (selectedBrush == terrain) Color(0xFF38BDF8) else Color(0xFF334155)
+                                    containerColor = if (selectedBrushMode == BrushMode.PLACE_HOST_CASTLE) Color(0xFF38BDF8) else Color(0xFF1E293B)
                                 ),
+                                border = BorderStroke(1.dp, Color(0xFF38BDF8)),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 4.dp)
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                             ) {
-                                Text(
-                                    terrain.name.take(5),
-                                    fontSize = 11.sp,
-                                    color = if (selectedBrush == terrain) Color.Black else Color.White
-                                )
+                                Icon(Icons.Default.Fort, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(14.dp).padding(end = 4.dp))
+                                Text("P1 Castle (Blue)", fontSize = 10.sp, color = Color.White)
+                            }
+                            Button(
+                                onClick = { selectedBrushMode = BrushMode.PLACE_CLIENT_CASTLE },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (selectedBrushMode == BrushMode.PLACE_CLIENT_CASTLE) Color(0xFFF43F5E) else Color(0xFF1E293B)
+                                ),
+                                border = BorderStroke(1.dp, Color(0xFFF43F5E)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                Icon(Icons.Default.Fort, contentDescription = null, tint = Color(0xFFF43F5E), modifier = Modifier.size(14.dp).padding(end = 4.dp))
+                                Text("P2 Castle (Red)", fontSize = 10.sp, color = Color.White)
                             }
                         }
                     }
                 }
 
-                // Grid layout preview
+                // Grid layout preview with zoom
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -677,7 +771,6 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
                         .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Let's draw our preview Hex Grid!
                     val hexRadius = when {
                         state.cols <= 6 -> 24.dp
                         state.cols <= 8 -> 18.dp
@@ -688,7 +781,14 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
                         hexRadius = hexRadius,
                         onTileTap = { r, c ->
                             if (state.isHost) {
-                                viewModel.paintTileTerrain(r, c, selectedBrush)
+                                when (selectedBrushMode) {
+                                    BrushMode.PAINT_PLAINS -> viewModel.paintTileTerrain(r, c, TerrainType.PLAINS)
+                                    BrushMode.PAINT_HILLS -> viewModel.paintTileTerrain(r, c, TerrainType.HILLS)
+                                    BrushMode.PAINT_WATER -> viewModel.paintTileTerrain(r, c, TerrainType.WATER)
+                                    BrushMode.PAINT_MOUNTAINS -> viewModel.paintTileTerrain(r, c, TerrainType.MOUNTAINS)
+                                    BrushMode.PLACE_HOST_CASTLE -> viewModel.setCastlePosition(PlayerType.HOST, r, c)
+                                    BrushMode.PLACE_CLIENT_CASTLE -> viewModel.setCastlePosition(PlayerType.CLIENT, r, c)
+                                }
                             }
                         }
                     )
@@ -696,7 +796,7 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
 
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = if (state.isHost) "Tap tiles on the preview grid above to paint the selected terrain type instantly." else "View live configuration updates drawn by Player 1 above.",
+                    text = if (state.isHost) "Brush / paint tiles above to change map features. Pinch or scroll mouse wheel to Zoom!" else "View live configuration updates drawn by Player 1 above. Zoom around!",
                     color = Color(0xFF94A3B8),
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center,
@@ -705,7 +805,7 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
             }
         }
 
-        // Unit Classes Config Panel
+        // Unit Classes Config Panel (Dynamic additions, deletions, edits)
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
             border = BorderStroke(1.dp, Color(0xFF334155)),
@@ -722,13 +822,35 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
                 )
 
                 state.unitClasses.forEachIndexed { idx, uc ->
-                    Text(
-                        text = uc.name.uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF38BDF8),
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp)
+                    ) {
+                        val classIcon = when (uc.iconName.lowercase()) {
+                            "archer" -> Icons.Default.Adjust
+                            "knight" -> Icons.Default.Shield
+                            "mage" -> Icons.Default.FlashOn
+                            "beast" -> Icons.Default.Pets
+                            else -> Icons.Default.DirectionsRun
+                        }
+                        Icon(classIcon, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = uc.name.uppercase(),
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF38BDF8),
+                            fontSize = 13.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (state.isHost && state.unitClasses.size > 1) {
+                            IconButton(
+                                onClick = { viewModel.deleteUnitClass(idx) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete Class", tint = Color.Red, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -759,6 +881,132 @@ fun HostConfigurationScreen(viewModel: GameViewModel, state: GameSessionState) {
                         }
                         ConfigIntPicker("QTY", uc.deploymentCount, state.isHost) { v ->
                             viewModel.updateUnitClassConfig(idx, hp = uc.hp, damage = uc.damage, energy = uc.energy, vision = uc.visionRange, range = uc.attackRange, count = v)
+                        }
+                    }
+                }
+
+                // Add New Unit Type Button / Form for Host
+                if (state.isHost) {
+                    var showAddForm by remember { mutableStateOf(false) }
+                    var newName by remember { mutableStateOf("") }
+                    var newHp by remember { mutableStateOf(10) }
+                    var newDmg by remember { mutableStateOf(4) }
+                    var newEng by remember { mutableStateOf(12) }
+                    var newVis by remember { mutableStateOf(3) }
+                    var newRng by remember { mutableStateOf(2) }
+                    var newQty by remember { mutableStateOf(3) }
+                    var selectedIcon by remember { mutableStateOf("Soldier") }
+
+                    if (!showAddForm) {
+                        Button(
+                            onClick = { showAddForm = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text("Add Custom Unit Type", fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                            border = BorderStroke(1.dp, Color(0xFF334155)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("New Custom Unit Class", fontWeight = FontWeight.Bold, color = Color.White)
+                                
+                                OutlinedTextField(
+                                    value = newName,
+                                    onValueChange = { newName = it },
+                                    label = { Text("Class Name (e.g., Mage, Cleric)", color = Color(0xFF94A3B8)) },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color(0xFF38BDF8),
+                                        unfocusedBorderColor = Color(0xFF334155),
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp)
+                                )
+
+                                Text("Select Icon Representation:", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.padding(vertical = 4.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                                ) {
+                                    listOf(
+                                        "Soldier" to Icons.Default.DirectionsRun,
+                                        "Archer" to Icons.Default.Adjust,
+                                        "Knight" to Icons.Default.Shield,
+                                        "Mage" to Icons.Default.FlashOn,
+                                        "Beast" to Icons.Default.Pets
+                                    ).forEach { (name, icon) ->
+                                        IconButton(
+                                            onClick = { selectedIcon = name },
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .background(
+                                                    if (selectedIcon == name) Color(0xFF38BDF8) else Color(0xFF1E293B),
+                                                    RoundedCornerShape(4.dp)
+                                                )
+                                        ) {
+                                            Icon(icon, contentDescription = name, tint = if (selectedIcon == name) Color.Black else Color.White, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ConfigIntPicker("HP", newHp, true) { newHp = it.coerceAtLeast(1) }
+                                    ConfigIntPicker("DMG", newDmg, true) { newDmg = it.coerceAtLeast(0) }
+                                    ConfigIntPicker("ENG", newEng, true) { newEng = it.coerceAtLeast(1) }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ConfigIntPicker("VIS", newVis, true) { newVis = it.coerceAtLeast(0) }
+                                    ConfigIntPicker("RNG", newRng, true) { newRng = it.coerceAtLeast(1) }
+                                    ConfigIntPicker("QTY", newQty, true) { newQty = it.coerceAtLeast(0) }
+                                }
+
+                                Row(
+                                    horizontalArrangement = Arrangement.End,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 12.dp)
+                                ) {
+                                    TextButton(onClick = { showAddForm = false }) {
+                                        Text("Cancel", color = Color.White)
+                                    }
+                                    Button(
+                                        onClick = {
+                                            if (newName.isNotBlank()) {
+                                                viewModel.addUnitClass(
+                                                    name = newName.trim(),
+                                                    hp = newHp,
+                                                    damage = newDmg,
+                                                    energy = newEng,
+                                                    vision = newVis,
+                                                    range = newRng,
+                                                    count = newQty,
+                                                    iconName = selectedIcon
+                                                )
+                                                newName = ""
+                                                showAddForm = false
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                        enabled = newName.isNotBlank()
+                                    ) {
+                                        Text("Create", color = Color.White)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1499,10 +1747,7 @@ fun HexGridPreviewLayout(
     hexRadius: Dp,
     onTileTap: (Int, Int) -> Unit
 ) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    ZoomableBox(modifier = Modifier.fillMaxSize()) { scale, offset, viewWidth, viewHeight ->
         val radiusPx = hexRadius.value
         val widthPx = radiusPx * 1.732f
         val heightPx = radiusPx * 2f
@@ -1512,48 +1757,57 @@ fun HexGridPreviewLayout(
         val totalGridWidth = (state.cols - 1) * horizontalSpacing + (widthPx / 2f)
         val totalGridHeight = (state.rows - 1) * verticalSpacing + heightPx
 
+        // Culling calculation
+        val leftLimit = (viewWidth / 2f) - (viewWidth / 2f + offset.x) / scale - (widthPx * 2f)
+        val topLimit = (viewHeight / 2f) - (viewHeight / 2f + offset.y) / scale - (heightPx * 2f)
+        val rightLimit = leftLimit + (viewWidth / scale) + (widthPx * 4f)
+        val bottomLimit = topLimit + (viewHeight / scale) + (heightPx * 4f)
+
         Box(
-            modifier = Modifier
-                .size(totalGridWidth.dp, totalGridHeight.dp)
+            modifier = Modifier.size(totalGridWidth.dp, totalGridHeight.dp)
         ) {
             state.tiles.forEach { tile ->
                 val x = tile.col * horizontalSpacing + (if (tile.row % 2 != 0) horizontalSpacing / 2f else 0f)
                 val y = tile.row * verticalSpacing
 
-                val terrainColor = when (tile.terrain) {
-                    TerrainType.PLAINS -> Color(0xFF15803D) // Emerald 700
-                    TerrainType.HILLS -> Color(0xFFEAB308) // Yellow 500
-                    TerrainType.WATER -> Color(0xFF1D4ED8) // Blue 700
-                    TerrainType.MOUNTAINS -> Color(0xFF78350F) // Amber 900
-                }
+                if (state.tiles.size <= 200 || (x in leftLimit..rightLimit && y in topLimit..bottomLimit)) {
+                    key(tile.row, tile.col) {
+                        val terrainColor = when (tile.terrain) {
+                            TerrainType.PLAINS -> Color(0xFF15803D) // Emerald 700
+                            TerrainType.HILLS -> Color(0xFFEAB308) // Yellow 500
+                            TerrainType.WATER -> Color(0xFF1D4ED8) // Blue 700
+                            TerrainType.MOUNTAINS -> Color(0xFF78350F) // Amber 900
+                        }
 
-                Box(
-                    modifier = Modifier
-                        .size(widthPx.dp, heightPx.dp)
-                        .offset(x.dp, y.dp)
-                        .clip(HexagonShape())
-                        .background(terrainColor)
-                        .clickable { onTileTap(tile.row, tile.col) }
-                ) {
-                    // Check if Castle
-                    if (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col) {
-                        Icon(
-                            imageVector = Icons.Default.Fort,
-                            contentDescription = "P1 Castle",
-                            tint = Color.White,
+                        Box(
                             modifier = Modifier
-                                .size((hexRadius.value * 1.2f).dp)
-                                .align(Alignment.Center)
-                        )
-                    } else if (tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) {
-                        Icon(
-                            imageVector = Icons.Default.Fort,
-                            contentDescription = "P2 Castle",
-                            tint = Color.Magenta,
-                            modifier = Modifier
-                                .size((hexRadius.value * 1.2f).dp)
-                                .align(Alignment.Center)
-                        )
+                                .size(widthPx.dp, heightPx.dp)
+                                .offset(x.dp, y.dp)
+                                .clip(HexagonShape())
+                                .background(terrainColor)
+                                .clickable { onTileTap(tile.row, tile.col) }
+                        ) {
+                            // Check if Castle
+                            if (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col) {
+                                Icon(
+                                    imageVector = Icons.Default.Fort,
+                                    contentDescription = "P1 Castle",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .size((hexRadius.value * 1.2f).dp)
+                                        .align(Alignment.Center)
+                                )
+                            } else if (tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) {
+                                Icon(
+                                    imageVector = Icons.Default.Fort,
+                                    contentDescription = "P2 Castle",
+                                    tint = Color.Magenta,
+                                    modifier = Modifier
+                                        .size((hexRadius.value * 1.2f).dp)
+                                        .align(Alignment.Center)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1569,10 +1823,7 @@ fun HexGridDeploymentLayout(
     selectedClass: String?,
     onTileTap: (Int, Int) -> Unit
 ) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    ZoomableBox(modifier = Modifier.fillMaxSize()) { scale, offset, viewWidth, viewHeight ->
         val radiusPx = hexRadius.value
         val widthPx = radiusPx * 1.732f
         val heightPx = radiusPx * 2f
@@ -1582,110 +1833,129 @@ fun HexGridDeploymentLayout(
         val totalGridWidth = (state.cols - 1) * horizontalSpacing + (widthPx / 2f)
         val totalGridHeight = (state.rows - 1) * verticalSpacing + heightPx
 
+        // Culling calculation
+        val leftLimit = (viewWidth / 2f) - (viewWidth / 2f + offset.x) / scale - (widthPx * 2f)
+        val topLimit = (viewHeight / 2f) - (viewHeight / 2f + offset.y) / scale - (heightPx * 2f)
+        val rightLimit = leftLimit + (viewWidth / scale) + (widthPx * 4f)
+        val bottomLimit = topLimit + (viewHeight / scale) + (heightPx * 4f)
+
         Box(modifier = Modifier.size(totalGridWidth.dp, totalGridHeight.dp)) {
             state.tiles.forEach { tile ->
                 val x = tile.col * horizontalSpacing + (if (tile.row % 2 != 0) horizontalSpacing / 2f else 0f)
                 val y = tile.row * verticalSpacing
 
-                val terrainColor = when (tile.terrain) {
-                    TerrainType.PLAINS -> Color(0xFF166534)
-                    TerrainType.HILLS -> Color(0xFFCA8A04)
-                    TerrainType.WATER -> Color(0xFF1E40AF)
-                    TerrainType.MOUNTAINS -> Color(0xFF78350F)
-                }
-
-                val inMyDeployZone = (myPlayer == PlayerType.HOST && tile.col < (state.cols / 3).coerceAtLeast(1)) ||
-                                     (myPlayer == PlayerType.CLIENT && tile.col >= state.cols - (state.cols / 3).coerceAtLeast(1))
-
-                val borderStrokeColor = when {
-                    inMyDeployZone -> Color(0xFF10B981) // Green border for deploy zone
-                    else -> Color(0xFF475569) // Dark Slate otherwise
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(widthPx.dp, heightPx.dp)
-                        .offset(x.dp, y.dp)
-                        .drawBehind {
-                            val w = size.width
-                            val h = size.height
-                            val path = Path().apply {
-                                moveTo(w / 2f, 0f)
-                                writeHexLine(w, h)
-                            }
-                            drawPath(path, terrainColor)
-                            drawPath(path, borderStrokeColor, style = Stroke(width = if (inMyDeployZone) 2.5.dp.toPx() else 1.dp.toPx()))
+                if (state.tiles.size <= 200 || (x in leftLimit..rightLimit && y in topLimit..bottomLimit)) {
+                    key(tile.row, tile.col) {
+                        val terrainColor = when (tile.terrain) {
+                            TerrainType.PLAINS -> Color(0xFF166534)
+                            TerrainType.HILLS -> Color(0xFFCA8A04)
+                            TerrainType.WATER -> Color(0xFF1E40AF)
+                            TerrainType.MOUNTAINS -> Color(0xFF78350F)
                         }
-                        .clickable { onTileTap(tile.row, tile.col) }
-                ) {
-                    // Highlight deployment zone tinted overlay
-                    if (inMyDeployZone) {
+
+                        val inMyDeployZone = (myPlayer == PlayerType.HOST && tile.col < (state.cols / 3).coerceAtLeast(1)) ||
+                                             (myPlayer == PlayerType.CLIENT && tile.col >= state.cols - (state.cols / 3).coerceAtLeast(1))
+
+                        val borderStrokeColor = when {
+                            inMyDeployZone -> Color(0xFF10B981) // Green border for deploy zone
+                            else -> Color(0xFF475569) // Dark Slate otherwise
+                        }
+
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color(0x1F10B981))
-                        )
-                    }
-
-                    // Render Castles
-                    if (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col) {
-                        Icon(
-                            imageVector = Icons.Default.Fort,
-                            contentDescription = "P1 Castle",
-                            tint = Color(0xFF38BDF8),
-                            modifier = Modifier
-                                .size((hexRadius.value * 1.3f).dp)
-                                .align(Alignment.Center)
-                        )
-                    } else if (tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) {
-                        Icon(
-                            imageVector = Icons.Default.Fort,
-                            contentDescription = "P2 Castle",
-                            tint = Color(0xFFF43F5E),
-                            modifier = Modifier
-                                .size((hexRadius.value * 1.3f).dp)
-                                .align(Alignment.Center)
-                        )
-                    }
-
-                    // Render any deployed unit on this tile
-                    val hostUnit = state.hostDeployedUnits.find { it.row == tile.row && it.col == tile.col }
-                    val clientUnit = state.clientDeployedUnits.find { it.row == tile.row && it.col == tile.col }
-                    val topUnit = hostUnit ?: clientUnit
-
-                    if (topUnit != null) {
-                        val badgeColor = if (topUnit.owner == PlayerType.HOST) Color(0xFF38BDF8) else Color(0xFFF43F5E)
-                        Column(
-                            modifier = Modifier.align(Alignment.Center),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .size(widthPx.dp, heightPx.dp)
+                                .offset(x.dp, y.dp)
+                                .drawBehind {
+                                    val w = size.width
+                                    val h = size.height
+                                    val path = Path().apply {
+                                        moveTo(w / 2f, 0f)
+                                        writeHexLine(w, h)
+                                    }
+                                    drawPath(path, terrainColor)
+                                    drawPath(path, borderStrokeColor, style = Stroke(width = if (inMyDeployZone) 2.5.dp.toPx() else 1.dp.toPx()))
+                                }
+                                .clickable { onTileTap(tile.row, tile.col) }
                         ) {
-                            Icon(
-                                imageVector = if (topUnit.isEngineer) Icons.Default.Build else Icons.Default.DirectionsRun,
-                                contentDescription = topUnit.className,
-                                tint = badgeColor,
-                                modifier = Modifier.size((hexRadius.value * 1.2f).dp)
-                            )
-                            Text(
-                                text = topUnit.className.take(3).uppercase(),
-                                color = Color.White,
-                                fontSize = (hexRadius.value * 0.5f).sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                            // Highlight deployment zone tinted overlay
+                            if (inMyDeployZone) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color(0x1F10B981))
+                                )
+                            }
 
-                        // Stacking Indicator Badge (+ENG badge)
-                        val hasStackedEng = (state.hostDeployedUnits + state.clientDeployedUnits)
-                            .count { it.row == tile.row && it.col == tile.col } > 1
+                            // Render Castles
+                            if (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col) {
+                                Icon(
+                                    imageVector = Icons.Default.Fort,
+                                    contentDescription = "P1 Castle",
+                                    tint = Color(0xFF38BDF8),
+                                    modifier = Modifier
+                                        .size((hexRadius.value * 1.3f).dp)
+                                        .align(Alignment.Center)
+                                )
+                            } else if (tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) {
+                                Icon(
+                                    imageVector = Icons.Default.Fort,
+                                    contentDescription = "P2 Castle",
+                                    tint = Color(0xFFF43F5E),
+                                    modifier = Modifier
+                                        .size((hexRadius.value * 1.3f).dp)
+                                        .align(Alignment.Center)
+                                )
+                            }
 
-                        if (hasStackedEng) {
-                            Box(
-                                modifier = Modifier
-                                    .size((hexRadius.value * 0.7f).dp)
-                                    .align(Alignment.TopEnd)
-                                    .background(Color(0xFF8B5CF6), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("+", color = Color.White, fontSize = (hexRadius.value * 0.45f).sp, fontWeight = FontWeight.Bold)
+                            // Render any deployed unit on this tile
+                            val hostUnit = state.hostDeployedUnits.find { it.row == tile.row && it.col == tile.col }
+                            val clientUnit = state.clientDeployedUnits.find { it.row == tile.row && it.col == tile.col }
+                            val topUnit = hostUnit ?: clientUnit
+
+                            if (topUnit != null) {
+                                val badgeColor = if (topUnit.owner == PlayerType.HOST) Color(0xFF38BDF8) else Color(0xFFF43F5E)
+                                Column(
+                                    modifier = Modifier.align(Alignment.Center),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    val unitClass = state.unitClasses.find { it.name == topUnit.className }
+                                    val iconVec = when (unitClass?.iconName?.lowercase()) {
+                                        "archer" -> Icons.Default.Adjust
+                                        "knight" -> Icons.Default.Shield
+                                        "mage" -> Icons.Default.FlashOn
+                                        "star" -> Icons.Default.Star
+                                        "beast" -> Icons.Default.Pets
+                                        else -> if (topUnit.isEngineer) Icons.Default.Build else Icons.Default.DirectionsRun
+                                    }
+                                    Icon(
+                                        imageVector = iconVec,
+                                        contentDescription = topUnit.className,
+                                        tint = badgeColor,
+                                        modifier = Modifier.size((hexRadius.value * 1.2f).dp)
+                                    )
+                                    Text(
+                                        text = topUnit.className.take(3).uppercase(),
+                                        color = Color.White,
+                                        fontSize = (hexRadius.value * 0.5f).sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // Stacking Indicator Badge (+ENG badge)
+                                val hasStackedEng = (state.hostDeployedUnits + state.clientDeployedUnits)
+                                    .count { it.row == tile.row && it.col == tile.col } > 1
+
+                                if (hasStackedEng) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size((hexRadius.value * 0.7f).dp)
+                                            .align(Alignment.TopEnd)
+                                            .background(Color(0xFF8B5CF6), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("+", color = Color.White, fontSize = (hexRadius.value * 0.45f).sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
                         }
                     }
@@ -1705,10 +1975,7 @@ fun HexGridGameplayLayout(
     selectedTargetIds: List<String>,
     onTileTap: (Int, Int) -> Unit
 ) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    ZoomableBox(modifier = Modifier.fillMaxSize()) { scale, offset, viewWidth, viewHeight ->
         val radiusPx = hexRadius.value
         val widthPx = radiusPx * 1.732f
         val heightPx = radiusPx * 2f
@@ -1718,172 +1985,191 @@ fun HexGridGameplayLayout(
         val totalGridWidth = (state.cols - 1) * horizontalSpacing + (widthPx / 2f)
         val totalGridHeight = (state.rows - 1) * verticalSpacing + heightPx
 
+        // Culling calculation
+        val leftLimit = (viewWidth / 2f) - (viewWidth / 2f + offset.x) / scale - (widthPx * 2f)
+        val topLimit = (viewHeight / 2f) - (viewHeight / 2f + offset.y) / scale - (heightPx * 2f)
+        val rightLimit = leftLimit + (viewWidth / scale) + (widthPx * 4f)
+        val bottomLimit = topLimit + (viewHeight / scale) + (heightPx * 4f)
+
         Box(modifier = Modifier.size(totalGridWidth.dp, totalGridHeight.dp)) {
             state.tiles.forEach { tile ->
                 val x = tile.col * horizontalSpacing + (if (tile.row % 2 != 0) horizontalSpacing / 2f else 0f)
                 val y = tile.row * verticalSpacing
 
-                // FOG OF WAR Dynamic visibility
-                val isVisible = !state.isHost && state.fogOfWarMode == FogOfWarMode.FOG_OF_WAR &&
-                                !state.tiles.any { isTileVisibleFromPlayer(myPlayer, tile.row, tile.col, state) }
-                
-                // Let's check visibility from Host/Client perspectives correctly
-                val actualVisible = if (state.fogOfWarMode == FogOfWarMode.FULL_VISIBILITY) {
-                    true
-                } else {
-                    isTileVisibleFromPlayer(myPlayer, tile.row, tile.col, state)
-                }
-
-                val terrainColor = if (actualVisible) {
-                    when (tile.terrain) {
-                        TerrainType.PLAINS -> Color(0xFF15803D)
-                        TerrainType.HILLS -> Color(0xFFEAB308)
-                        TerrainType.WATER -> Color(0xFF1D4ED8)
-                        TerrainType.MOUNTAINS -> Color(0xFF78350F)
-                    }
-                } else {
-                    Color(0xFF1E293B).copy(alpha = 0.5f) // fog dimmed terrain
-                }
-
-                // Interactive ranges highlights
-                val selectedUnit = (state.hostDeployedUnits + state.clientDeployedUnits).find { it.id == selectedUnitId }
-                
-                val isMoveRange = selectedUnit != null && selectedUnit.owner == myPlayer &&
-                                  hexDist(selectedUnit.row, selectedUnit.col, tile.row, tile.col) == 1 &&
-                                  tile.terrain != TerrainType.MOUNTAINS &&
-                                  !(tile.terrain == TerrainType.WATER && !tile.hasBridge)
-
-                val isAttackRange = selectedUnit != null && selectedUnit.owner == myPlayer &&
-                                    hexDist(selectedUnit.row, selectedUnit.col, tile.row, tile.col) <= selectedUnit.attackRange &&
-                                    !isLOSBlocked(selectedUnit.row, selectedUnit.col, tile.row, tile.col, state.tiles)
-
-                val isSelectedTarget = targetSelectionMode && (
-                        selectedTargetIds.contains("CASTLE") && (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col || tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) ||
-                        state.hostDeployedUnits.any { it.row == tile.row && it.col == tile.col && selectedTargetIds.contains(it.id) } ||
-                        state.clientDeployedUnits.any { it.row == tile.row && it.col == tile.col && selectedTargetIds.contains(it.id) }
-                )
-
-                val borderStrokeColor = when {
-                    isSelectedTarget -> Color(0xFFEF4444) // Targeting glowing Red
-                    selectedUnit != null && selectedUnit.row == tile.row && selectedUnit.col == tile.col -> Color(0xFFF59E0B) // Active unit glowing yellow
-                    isMoveRange && isMyTurn(state, myPlayer) -> Color(0xFF10B981) // Movable green
-                    isAttackRange && targetSelectionMode && isMyTurn(state, myPlayer) -> Color(0xFFEF4444) // Attacking red
-                    else -> Color(0xFF475569) // Standard dark border
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(widthPx.dp, heightPx.dp)
-                        .offset(x.dp, y.dp)
-                        .drawBehind {
-                            val w = size.width
-                            val h = size.height
-                            val path = Path().apply {
-                                moveTo(w / 2f, 0f)
-                                writeHexLine(w, h)
-                            }
-                            drawPath(path, terrainColor)
-                            drawPath(path, borderStrokeColor, style = Stroke(width = if (isSelectedTarget || isMoveRange) 2.5.dp.toPx() else 1.dp.toPx()))
-
-                            // Draw Trench icon overlay
-                            if (tile.hasTrench && actualVisible) {
-                                drawCircle(
-                                    color = Color(0x3F000000),
-                                    radius = w * 0.35f
-                                )
-                                val tPath = Path().apply {
-                                    moveTo(w * 0.25f, h * 0.5f)
-                                    lineTo(w * 0.75f, h * 0.5f)
-                                }
-                                drawPath(tPath, Color(0xFFE2E8F0), style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
-                            }
-
-                            // Draw Bridge icon overlay
-                            if (tile.hasBridge && actualVisible) {
-                                val bPath = Path().apply {
-                                    moveTo(w * 0.2f, h * 0.35f)
-                                    lineTo(w * 0.8f, h * 0.35f)
-                                    moveTo(w * 0.2f, h * 0.65f)
-                                    lineTo(w * 0.8f, h * 0.65f)
-                                    moveTo(w * 0.4f, h * 0.35f)
-                                    lineTo(w * 0.4f, h * 0.65f)
-                                    moveTo(w * 0.6f, h * 0.35f)
-                                    lineTo(w * 0.6f, h * 0.65f)
-                                }
-                                drawPath(bPath, Color(0xFFCA8A04), style = Stroke(width = 2.dp.toPx()))
-                            }
+                if (state.tiles.size <= 200 || (x in leftLimit..rightLimit && y in topLimit..bottomLimit)) {
+                    key(tile.row, tile.col) {
+                        // FOG OF WAR Dynamic visibility
+                        val isVisible = !state.isHost && state.fogOfWarMode == FogOfWarMode.FOG_OF_WAR &&
+                                        !state.tiles.any { isTileVisibleFromPlayer(myPlayer, tile.row, tile.col, state) }
+                        
+                        // Let's check visibility from Host/Client perspectives correctly
+                        val actualVisible = if (state.fogOfWarMode == FogOfWarMode.FULL_VISIBILITY) {
+                            true
+                        } else {
+                            isTileVisibleFromPlayer(myPlayer, tile.row, tile.col, state)
                         }
-                        .clickable { onTileTap(tile.row, tile.col) }
-                ) {
-                    // Fog darker cover
-                    if (!actualVisible) {
+
+                        val terrainColor = if (actualVisible) {
+                            when (tile.terrain) {
+                                TerrainType.PLAINS -> Color(0xFF15803D)
+                                TerrainType.HILLS -> Color(0xFFEAB308)
+                                TerrainType.WATER -> Color(0xFF1D4ED8)
+                                TerrainType.MOUNTAINS -> Color(0xFF78350F)
+                            }
+                        } else {
+                            Color(0xFF1E293B).copy(alpha = 0.5f) // fog dimmed terrain
+                        }
+
+                        // Interactive ranges highlights
+                        val selectedUnit = (state.hostDeployedUnits + state.clientDeployedUnits).find { it.id == selectedUnitId }
+                        
+                        val isMoveRange = selectedUnit != null && selectedUnit.owner == myPlayer &&
+                                          hexDist(selectedUnit.row, selectedUnit.col, tile.row, tile.col) == 1 &&
+                                          tile.terrain != TerrainType.MOUNTAINS &&
+                                          !(tile.terrain == TerrainType.WATER && !tile.hasBridge)
+
+                        val isAttackRange = selectedUnit != null && selectedUnit.owner == myPlayer &&
+                                            hexDist(selectedUnit.row, selectedUnit.col, tile.row, tile.col) <= selectedUnit.attackRange &&
+                                            !isLOSBlocked(selectedUnit.row, selectedUnit.col, tile.row, tile.col, state.tiles)
+
+                        val isSelectedTarget = targetSelectionMode && (
+                                selectedTargetIds.contains("CASTLE") && (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col || tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) ||
+                                state.hostDeployedUnits.any { it.row == tile.row && it.col == tile.col && selectedTargetIds.contains(it.id) } ||
+                                state.clientDeployedUnits.any { it.row == tile.row && it.col == tile.col && selectedTargetIds.contains(it.id) }
+                        )
+
+                        val borderStrokeColor = when {
+                            isSelectedTarget -> Color(0xFFEF4444) // Targeting glowing Red
+                            selectedUnit != null && selectedUnit.row == tile.row && selectedUnit.col == tile.col -> Color(0xFFF59E0B) // Active unit glowing yellow
+                            isMoveRange && isMyTurn(state, myPlayer) -> Color(0xFF10B981) // Movable green
+                            isAttackRange && targetSelectionMode && isMyTurn(state, myPlayer) -> Color(0xFFEF4444) // Attacking red
+                            else -> Color(0xFF475569) // Standard dark border
+                        }
+
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color(0x99020617))
-                        )
-                    } else {
-                        // Render Castles if visible
-                        if (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col) {
-                            Icon(
-                                imageVector = Icons.Default.Fort,
-                                contentDescription = "P1 Castle",
-                                tint = Color(0xFF38BDF8),
-                                modifier = Modifier
-                                    .size((hexRadius.value * 1.35f).dp)
-                                    .align(Alignment.Center)
-                            )
-                        } else if (tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) {
-                            Icon(
-                                imageVector = Icons.Default.Fort,
-                                contentDescription = "P2 Castle",
-                                tint = Color(0xFFF43F5E),
-                                modifier = Modifier
-                                    .size((hexRadius.value * 1.35f).dp)
-                                    .align(Alignment.Center)
-                            )
-                        }
+                                .size(widthPx.dp, heightPx.dp)
+                                .offset(x.dp, y.dp)
+                                .drawBehind {
+                                    val w = size.width
+                                    val h = size.height
+                                    val path = Path().apply {
+                                        moveTo(w / 2f, 0f)
+                                        writeHexLine(w, h)
+                                    }
+                                    drawPath(path, terrainColor)
+                                    drawPath(path, borderStrokeColor, style = Stroke(width = if (isSelectedTarget || isMoveRange) 2.5.dp.toPx() else 1.dp.toPx()))
 
-                        // Render Unit if visible
-                        val hostUnit = state.hostDeployedUnits.find { it.row == tile.row && it.col == tile.col }
-                        val clientUnit = state.clientDeployedUnits.find { it.row == tile.row && it.col == tile.col }
-                        val topUnit = hostUnit ?: clientUnit
+                                    // Draw Trench icon overlay
+                                    if (tile.hasTrench && actualVisible) {
+                                        drawCircle(
+                                            color = Color(0x3F000000),
+                                            radius = w * 0.35f
+                                        )
+                                        val tPath = Path().apply {
+                                            moveTo(w * 0.25f, h * 0.5f)
+                                            lineTo(w * 0.75f, h * 0.5f)
+                                        }
+                                        drawPath(tPath, Color(0xFFE2E8F0), style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+                                    }
 
-                        if (topUnit != null) {
-                            val badgeColor = if (topUnit.owner == PlayerType.HOST) Color(0xFF38BDF8) else Color(0xFFF43F5E)
-                            Column(
-                                modifier = Modifier.align(Alignment.Center),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    imageVector = if (topUnit.isEngineer) Icons.Default.Build else Icons.Default.DirectionsRun,
-                                    contentDescription = topUnit.className,
-                                    tint = badgeColor,
-                                    modifier = Modifier.size((hexRadius.value * 1.2f).dp)
-                                )
-                                Text(
-                                    text = "${topUnit.hp}",
-                                    color = Color.White,
-                                    fontSize = (hexRadius.value * 0.55f).sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier
-                                        .background(Color(0x99000000), RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                                )
-                            }
-
-                            // Stacked Unit overlay indicator
-                            val unitCount = (state.hostDeployedUnits + state.clientDeployedUnits)
-                                .count { it.row == tile.row && it.col == tile.col }
-                            if (unitCount > 1) {
+                                    // Draw Bridge icon overlay
+                                    if (tile.hasBridge && actualVisible) {
+                                        val bPath = Path().apply {
+                                            moveTo(w * 0.2f, h * 0.35f)
+                                            lineTo(w * 0.8f, h * 0.35f)
+                                            moveTo(w * 0.2f, h * 0.65f)
+                                            lineTo(w * 0.8f, h * 0.65f)
+                                            moveTo(w * 0.4f, h * 0.35f)
+                                            lineTo(w * 0.4f, h * 0.65f)
+                                            moveTo(w * 0.6f, h * 0.35f)
+                                            lineTo(w * 0.6f, h * 0.65f)
+                                        }
+                                        drawPath(bPath, Color(0xFFCA8A04), style = Stroke(width = 2.dp.toPx()))
+                                    }
+                                }
+                                .clickable { onTileTap(tile.row, tile.col) }
+                        ) {
+                            // Fog darker cover
+                            if (!actualVisible) {
                                 Box(
                                     modifier = Modifier
-                                        .size((hexRadius.value * 0.7f).dp)
-                                        .align(Alignment.TopEnd)
-                                        .background(Color(0xFF8B5CF6), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("+", color = Color.White, fontSize = (hexRadius.value * 0.45f).sp, fontWeight = FontWeight.Bold)
+                                        .fillMaxSize()
+                                        .background(Color(0x99020617))
+                                )
+                            } else {
+                                // Render Castles if visible
+                                if (tile.row == state.hostCastlePos.row && tile.col == state.hostCastlePos.col) {
+                                    Icon(
+                                        imageVector = Icons.Default.Fort,
+                                        contentDescription = "P1 Castle",
+                                        tint = Color(0xFF38BDF8),
+                                        modifier = Modifier
+                                            .size((hexRadius.value * 1.35f).dp)
+                                            .align(Alignment.Center)
+                                    )
+                                } else if (tile.row == state.clientCastlePos.row && tile.col == state.clientCastlePos.col) {
+                                    Icon(
+                                        imageVector = Icons.Default.Fort,
+                                        contentDescription = "P2 Castle",
+                                        tint = Color(0xFFF43F5E),
+                                        modifier = Modifier
+                                            .size((hexRadius.value * 1.35f).dp)
+                                            .align(Alignment.Center)
+                                    )
+                                }
+
+                                // Render Unit if visible
+                                val hostUnit = state.hostDeployedUnits.find { it.row == tile.row && it.col == tile.col }
+                                val clientUnit = state.clientDeployedUnits.find { it.row == tile.row && it.col == tile.col }
+                                val topUnit = hostUnit ?: clientUnit
+
+                                if (topUnit != null) {
+                                    val badgeColor = if (topUnit.owner == PlayerType.HOST) Color(0xFF38BDF8) else Color(0xFFF43F5E)
+                                    Column(
+                                        modifier = Modifier.align(Alignment.Center),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        val unitClass = state.unitClasses.find { it.name == topUnit.className }
+                                        val iconVec = when (unitClass?.iconName?.lowercase()) {
+                                            "archer" -> Icons.Default.Adjust
+                                            "knight" -> Icons.Default.Shield
+                                            "mage" -> Icons.Default.FlashOn
+                                            "star" -> Icons.Default.Star
+                                            "beast" -> Icons.Default.Pets
+                                            else -> if (topUnit.isEngineer) Icons.Default.Build else Icons.Default.DirectionsRun
+                                        }
+                                        Icon(
+                                            imageVector = iconVec,
+                                            contentDescription = topUnit.className,
+                                            tint = badgeColor,
+                                            modifier = Modifier.size((hexRadius.value * 1.2f).dp)
+                                        )
+                                        Text(
+                                            text = "${topUnit.hp}",
+                                            color = Color.White,
+                                            fontSize = (hexRadius.value * 0.55f).sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            modifier = Modifier
+                                                .background(Color(0x99000000), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+
+                                    // Stacked Unit overlay indicator
+                                    val unitCount = (state.hostDeployedUnits + state.clientDeployedUnits)
+                                        .count { it.row == tile.row && it.col == tile.col }
+                                    if (unitCount > 1) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size((hexRadius.value * 0.7f).dp)
+                                                .align(Alignment.TopEnd)
+                                                .background(Color(0xFF8B5CF6), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("+", color = Color.White, fontSize = (hexRadius.value * 0.45f).sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2024,4 +2310,97 @@ fun getNeighbors(row: Int, col: Int, maxRows: Int, maxCols: Int): List<HexPosSta
         )
     }
     return directions.filter { it.row in 0 until maxRows && it.col in 0 until maxCols }
+}
+
+enum class BrushMode {
+    PAINT_PLAINS,
+    PAINT_HILLS,
+    PAINT_WATER,
+    PAINT_MOUNTAINS,
+    PLACE_HOST_CASTLE,
+    PLACE_CLIENT_CASTLE
+}
+
+@Composable
+fun ZoomableBox(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.(scale: Float, offset: Offset, viewWidth: Float, viewHeight: Float) -> Unit
+) {
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .clip(RectangleShape)
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(0.1f, 5f)
+                    offset += pan
+                }
+            }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val changes = event.changes
+                        val scrollDelta = changes.firstOrNull()?.scrollDelta
+                        if (scrollDelta != null && scrollDelta.y != 0f) {
+                            val zoomFactor = if (scrollDelta.y > 0) 0.9f else 1.1f
+                            scale = (scale * zoomFactor).coerceIn(0.1f, 5f)
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        val viewWidth = maxWidth.value
+        val viewHeight = maxHeight.value
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offset.x,
+                    translationY = offset.y
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            content(scale, offset, viewWidth, viewHeight)
+        }
+
+        // Overlay controls for Zoom In, Zoom Out, Reset (elegant, small)
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(8.dp)
+                .background(Color(0x7F1E293B), RoundedCornerShape(8.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            IconButton(
+                onClick = { scale = (scale * 1.2f).coerceIn(0.1f, 5f) },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Zoom In", tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+            IconButton(
+                onClick = { scale = (scale * 0.8f).coerceIn(0.1f, 5f) },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(Icons.Default.Remove, contentDescription = "Zoom Out", tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+            IconButton(
+                onClick = {
+                    scale = 1f
+                    offset = Offset.Zero
+                },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = "Reset Zoom", tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+        }
+    }
 }
