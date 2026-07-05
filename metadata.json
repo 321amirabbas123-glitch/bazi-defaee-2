@@ -1,0 +1,6 @@
+{
+  "name": "Hex LAN Tactics",
+  "description": "A 2-player turn-based LAN hex strategy game featuring full host authority, custom presets, tactical fog of war, and engineer mechanics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
