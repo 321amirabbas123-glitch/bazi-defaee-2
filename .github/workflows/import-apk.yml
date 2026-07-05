@@ -1,0 +1,35 @@
+name: Import APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 28744718155
+          name: apk
+          path: artifact
+
+      - name: Move APK
+        run: |
+          cp artifact/*.apk app.apk
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add app.apk
+          git commit -m "Add APK artifact" || exit 0
+          git push
